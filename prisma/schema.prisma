@@ -1,0 +1,125 @@
+// Mëso Shqip🦅 — Database schema
+// Multilingual content is stored as JSON objects keyed by language code:
+// { "sq": "...", "en": "...", "de": "...", "it": "...", "fr": "...", "es": "..." }
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Learner {
+  id           String         @id @default(cuid())
+  name         String
+  avatar       String?
+  streak       Int            @default(0)
+  lastActive   DateTime?
+  totalXp      Int            @default(0)
+  createdAt    DateTime       @default(now())
+  progress     Progress[]
+  certificates Certificate[]
+  achievements Achievement[]
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  // JSON: { sq, en, de, it, fr, es } display name
+  name      Json
+  icon      String
+  color     String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  lessons   Lesson[]
+}
+
+model Lesson {
+  id         String     @id @default(cuid())
+  slug       String     @unique
+  categoryId String
+  category   Category   @relation(fields: [categoryId], references: [id])
+  difficulty String     // "fillim" | "mesatar" | "avancuar"
+  // JSON: { sq, en, de, it, fr, es }
+  title      Json
+  summary    Json
+  content    Json
+  xpReward   Int        @default(50)
+  duration   Int        @default(10)
+  coverEmoji String     @default("📘")
+  order      Int        @default(0)
+  published  Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  exercises  Exercise[]
+  progress   Progress[]
+}
+
+model Exercise {
+  id        String   @id @default(cuid())
+  lessonId  String
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  // "quiz" | "flashcard" | "matching" | "fill"
+  type      String
+  // JSON payload, shape depends on type (see src/lib/types.ts)
+  data      Json
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Progress {
+  id          String    @id @default(cuid())
+  learnerId   String
+  learner     Learner   @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  status      String    @default("not_started") // not_started | in_progress | completed
+  score       Int       @default(0)
+  xpEarned    Int       @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([learnerId, lessonId])
+}
+
+model Dictionary {
+  id            String   @id @default(cuid())
+  word          String   @unique
+  pronunciation String?
+  // JSON translations: { sq, en, de, it, fr, es }
+  translations  Json
+  // JSON example sentence: { sq, en, de, it, fr, es }
+  example       Json
+  category      String   @default("të përgjithshme")
+  emoji         String?
+  createdAt     DateTime @default(now())
+}
+
+model Certificate {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  learnerId   String
+  learner     Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  lessonSlug  String
+  // JSON snapshot of lesson title: { sq, en, de, it, fr, es }
+  lessonTitle Json
+  learnerName String
+  score       Int
+  issuedAt    DateTime @default(now())
+}
+
+model Achievement {
+  id        String   @id @default(cuid())
+  learnerId String
+  learner   Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  type      String   // first_lesson | streak_7 | words_50 | quiz_master | polyglot
+  // JSON title: { sq, en, de, it, fr, es }
+  title     Json
+  icon      String
+  createdAt DateTime @default(now())
+
+  @@unique([learnerId, type])
+}
